@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html>
+	<head>
+
+		<meta charset="UTF-8">
+		<title>URGENCE INFORMATIQUE</title>
+
+		<link type="text/css" href="css/ui-lightness/jquery-ui-1.8.18.custom.css" rel="stylesheet" />
+		<script type="text/javascript" src="js/jquery-1.7.1.min.js"></script>
+		<script type="text/javascript" src="js/jquery-ui-1.8.18.custom.min.js"></script>
+	<script type="text/javascript">
+		
+			function showAlert(text, title) {
+				title = (title == undefined) ? 'Alert:' : title;
+				
+				$('#alertTitle').html(title);
+				$('#alertMessage').html(text);
+				$('#alertWidget').slideDown(300).delay(3000).slideUp(400);
+
+			}
+		
+			// une fois le DOM prêt ...
+			$(function(){
+			
+				// cacher le paneau des messages d'alerte …
+				$('#alertWidget').hide(0);
+				
+				// cacher les suggestions
+				$('#querySuggestions').hide(0);
+				
+				// faire en sorte que lorsque l'on change le texte du champ de recherche, on affiche la boîte de suggestions
+				$('[name="query"]').keyup(function(event){
+					
+					var suggestionBoxIsHidden = ($("#querySuggestions").css('display') == 'none');
+					var textInQueryTextField = $(this).attr('value');
+					var lengthOfTextInQueryTextField = textInQueryTextField.length;
+					var aboutToShow = false;
+					
+					// on masque les suggestions automatiquement lorsque la zone texte est vide
+					if (!suggestionBoxIsHidden && lengthOfTextInQueryTextField == 0) {
+						hideSuggestionsBox();
+					}
+					// sinon, si c'est invisible et que l'on saisit du texte, alors le montrer
+					else if (suggestionBoxIsHidden && lengthOfTextInQueryTextField > 0) {
+						showSuggestionsBox();
+						aboutToShow = true;
+					}
+					
+					// on ajoute les suggestions en fonction du texte saisi
+					if (!suggestionBoxIsHidden || aboutToShow) {
+					
+						// TODO 1 : faites une requête AJAX sur "suggestions.php" afin de récupérer une liste de suggestions.
+						//        Ajoutez ces suggestions à la page grâce à la fonction appendSuggestion(text).
+						
+						// pour voir un exemple d'insertion sans AJAX décommentez les lignes suivantes:
+						/*
+						 clearSuggestions();
+						 appendSuggestion('vous avez');
+						 appendSuggestion('saisi le texte');
+						 appendSuggestion('suivant : ' + textInQueryTextField);
+						 */
+					}
+					
+				});
+						 				
+				// que faire lors de la soumission du formulaire de recherche …
+				$('#queryForm').submit(function(){
+					
+					formData = new FormData();
+					formData.append('query', $('[name="query"]').attr('value'));
+					
+					$.ajax({
+						url: "query.php",
+						type: "POST",
+						contentType: false,
+						processData: false,
+						data: formData,
+						dataType: 'json'
+					}).error(function(jqXHR, textStatus, errorThrown){
+					
+						// :-( … affichez un message d'erreur.
+						showAlert(errorThrown, textStatus);
+					
+					}).success(function(jsonResponse){
+						
+						// retirer les résultats précédents …
+						// TODO 3 : Retirez les résultats précédents
+						
+						// afficher les résultats
+						$(jsonResponse.results).each(function(i){
+							// TODO 4 : Ajoutez les résultats et affichez-les
+						});
+						
+					});
+					
+					// fermer la liste des suggestions
+					hideSuggestionsBox();
+					
+					// déplacer la boîte de résultats vers le haut de la page et afficher les résultats
+					$('#queryForm').animate({
+						top: "5%"
+					});
+					
+					// empêcher la soumission normale car gérée juste avant par ajax
+					return false;
+				});
+				
+				// que faire lors de la soumission du formulaire de login
+				$('#loginForm').submit(function(){
+					
+					formData = new FormData();
+					formData.append('login', $('#loginForm [name="login"]').attr('value'));
+					formData.append('password', $('#loginForm [name="password"]').attr('value'));
+					
+					$.ajax({
+						url: "login.php",
+						type: "POST",
+						contentType: false,
+						processData: false,
+						data: formData,
+						dataType: 'json'
+					}).error(function(jqXHR, textStatus, errorThrown){
+					
+						showAlert(errorThrown, textStatus);
+					
+					}).success(function(jsonResponse){
+						
+						if (jsonResponse.auth_ok != 'true') {
+							// échec
+							showAlert('Combinaison login/password incorrecte. Veuillez recommencer.');
+						} else {
+							// succès
+							authSuccess(jsonResponse);
+						}
+												
+					});	
+							
+					// empêcher la soumission normale car gérée juste avant par ajax
+					return false;
+				});
+				
+				// faire en sorte que lorsque l'on clique sur un élément li de la suggestionBox que l'on mette ce texte dans le champ texte
+				$('#querySuggestions').on('click', 'li', function(){
+					$('[name="query"]').attr('value', $(this).text());
+					hideSuggestionsBox();
+				});
+				
+				// vérifier au chargement si l'utilisateur est déjà loggué …
+				$.ajax({
+					url: "login_info.php",
+					dataType: 'json',
+					success: authSuccess
+				});
+				
+			});
+			
+			function signout() {
+				$("#loggedMessage").remove();
+				$('#userMenu').remove();
+				$('#loginForm').show();
+				
+				$.ajax("logout.php");
+			}
+			
+			function authSuccess(jsonResponse) {
+				if (jsonResponse.auth_ok == 'true') {
+					$('#loginForm').hide();
+					$('#loginForm [placeholder]').attr('value','');
+					$('<span id="loggedMessage">You are currently logged in as ' + jsonResponse.user.name + '.<a href="javascript:signout()">sign out</a></span>').appendTo('#loginBox');
+					
+					$.ajax({
+						url: jsonResponse.menuUrl,
+						type: "GET",
+						dataType: 'html'
+					}).success(function(menuHtml){
+						$('<div id="userMenu"></div>').html(menuHtml).appendTo('body');
+					});
+				}
+			}
+			
+			function showSuggestionsBox() {
+				$("#querySuggestions").show('slow');
+			}
+			
+			function hideSuggestionsBox() {
+				$("#querySuggestions").hide('slow');
+				clearSuggestions();
+			}
+			
+			function clearSuggestions() {
+				$('#querySuggestions').html('');
+			}
+			
+			function appendSuggestion(text) {
+				$('<li></li>').text(text).appendTo('#querySuggestions');
+			}
+		</script>
+
+
+		<style type="text/css">
+
+		h1{
+			font-size:300%;
+			ont-family:"verdana",Times,serif;
+			text-decoration:blink;
+			text-align:center;
+			color: 	#00BFFF ;
+		}
+
+		#milieu{
+			margin:15px 520px 0px 320px;
+		}
+
+		body{
+			 padding: 0;
+			 margin: 0;
+			 background-color: white;
+			 color: #333;
+			 font-family: Verdana, Arial, Helvetica, sans-serif;
+			}
+
+			#loginBox {
+			
+				font-size: 12px;
+				text-align: center;
+				position: relative;
+				top: 15px;
+				right: 15px;
+			
+			}
+	
+
+
+			#loginBox input[type="submit"] {
+				border-radius: 10px;
+				display: inline-block;
+				margin: 5px;
+				width: 60px;
+			}
+		</style>
+
+		</head>
+	<body>
+		<h1>URGENCE INFORMATIQUE</h1>
+<!-- page de départ pour se connecter au site reste à trouver une solution pur la rendre fonctionnel parce que maintenant je n'arrive pas à transferé les donné login password
+	popur passé a la page principal malgré que le login password existe 
+-->
+	
+			<div id="loginBox">
+			<form id="loginForm" action="login.php">
+				<div>Login</div>
+				<input type="text" name="login" placeholder="email address"  method="get">
+				<input type="password" name="password" placeholder="password">
+				<input type="submit" value="Sign In">
+			</form>
+		</div>
+	
+	<!-- /*<div id="loginBox">
+			<form id="loginForm" action="verif.php" method="get">
+				<span>Login</span>
+				<input type="text" name="login" placeholder="email address">
+				<input type="password" name="password" placeholder="password">
+				<input type="submit" value="Sign In">
+			</form>
+			
+		</div>	-->
+		<div id="alertWidget" class="ui-widget">
+			<div class="ui-state-error ui-corner-all" style="padding: 0 .7em; text-align: center;">
+				<p>
+					<span class="ui-icon ui-icon-alert" style="float: left; margin-right: .3em;"></span>
+					<span class="ui-icon ui-icon-alert" style="float: right; margin-left: .3em;"></span>
+					<strong id="alertTitle"></strong> <span id="alertMessage"></span>
+				</p>
+			</div>
+		</div>
+		<div id="loginBox">
+			
+			<div>Email: contact@UI.com</div>
+			<div>tel:010101010101</div>
+		</div>
+
+
+	</body>
+	</html>
